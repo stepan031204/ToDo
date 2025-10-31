@@ -1,16 +1,12 @@
 package main
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"strings"
-
-	"fyne.io/fyne/v2"
-	"fyne.io/fyne/v2/app"
-	"fyne.io/fyne/v2/container"
-	"fyne.io/fyne/v2/dialog"
-	"fyne.io/fyne/v2/widget"
 )
 
 type Task struct {
@@ -23,135 +19,144 @@ var tasks []Task
 var fileName = "task.json"
 
 func loadTasks() {
-	data, err := os.ReadFile(fileName)
+	file, err := ioutil.ReadFile(fileName)
 	if err != nil {
 		if os.IsNotExist(err) {
 			tasks = []Task{}
 			return
 		}
-		fmt.Println("Ошибка чтения файла:", err)
-		return
+		fmt.Println("fail", err)
+		os.Exit(1)
 	}
-	json.Unmarshal(data, &tasks)
+	json.Unmarshal(file, &tasks)
 }
 
-func saveTasks() {
+func saveTasks(tasks []Task) {
 	data, err := json.MarshalIndent(tasks, "", "  ")
+
 	if err != nil {
-		fmt.Println("Ошибка при сохранении:", err)
-		return
+		fmt.Println("Ошибка при сохранение задачи", err)
 	}
-	os.WriteFile(fileName, data, 0644)
+	ioutil.WriteFile(fileName, data, 0644)
+}
+
+func listTasks() {
+	if len(tasks) == 0 {
+		fmt.Println("Список пуст")
+	} else {
+		fmt.Println("Список задач:")
+	}
+	for _, t := range tasks {
+		status := "[ ]"
+		if t.Done {
+			status = "[x]"
+		}
+		fmt.Printf("%d. %s %s\n", t.ID, t.Name, status)
+	}
+
+}
+
+func addTask() []Task {
+	id := 0
+
+	fmt.Println("Введите название задачи:")
+	reader := bufio.NewReader(os.Stdin)
+	name, _ := reader.ReadString('\n')
+	name = strings.TrimSpace(name)
+
+	if len(tasks) > 0 {
+		id = tasks[len(tasks)-1].ID + 1
+	}
+	tasks = append(tasks, Task{ID: id, Name: name, Done: false})
+	saveTasks(tasks)
+	return tasks
+}
+
+func removeTask(tasks []Task) []Task {
+	index := -1
+	var id int
+
+	fmt.Println("Введите id")
+	fmt.Scanln(&id)
+	for i, t := range tasks {
+		if t.ID == id {
+			index = i
+			break
+		}
+	}
+	if index == -1 {
+		fmt.Println("Задача с таким ID не найдена.")
+		return tasks
+	}
+
+	tasks = append(tasks[:index], tasks[index+1:]...)
+	for i := range tasks {
+		tasks[i].ID = i + 1
+	}
+	saveTasks(tasks)
+	return tasks
+}
+func changeStatus(tasks []Task) []Task {
+	var id int
+	fmt.Println("Введите id")
+	fmt.Scanln(&id)
+
+	for i := range tasks {
+		if tasks[i].ID == id {
+			tasks[i].Done = true
+		}
+	}
+	saveTasks(tasks)
+	return tasks
+}
+
+func renameTask(tasks []Task) []Task {
+	var id int
+	fmt.Println("Введите id")
+	fmt.Scanln(&id)
+
+	for i := range tasks {
+		if tasks[i].ID == id {
+			fmt.Println("Введите новое название")
+			reader := bufio.NewReader(os.Stdin)
+			name, _ := reader.ReadString('\n')
+			name = strings.TrimSpace(name)
+			tasks[i].Name = name
+
+		}
+	}
+	saveTasks(tasks)
+	return tasks
 }
 
 func main() {
+
 	loadTasks()
 
-	a := app.New()
-	w := a.NewWindow("To-Do List")
-	w.Resize(fyne.NewSize(400, 500))
+	for {
+		var command string
 
-	// Список задач
-	list := widget.NewList(
-		func() int { return len(tasks) },
-		func() fyne.CanvasObject { return widget.NewLabel("") },
-		func(i widget.ListItemID, o fyne.CanvasObject) {
-			status := "[ ]"
-			if tasks[i].Done {
-				status = "[x]"
-			}
-			o.(*widget.Label).SetText(fmt.Sprintf("%d. %s %s", tasks[i].ID, tasks[i].Name, status))
-		},
-	)
+		fmt.Println("\n1)Список \n2)Добавить \n3)Удалить \n4)Изменить \n5)Статус \n6)Загрузить \n7)Выйти")
+		fmt.Scan(&command)
+		fmt.Println("")
 
-	// Поле ввода для новой задачи
-	input := widget.NewEntry()
-	input.SetPlaceHolder("Введите название задачи")
-
-	// Кнопка добавить
-	addBtn := widget.NewButton("Добавить", func() {
-		name := strings.TrimSpace(input.Text)
-		if name == "" {
+		switch command {
+		case "1":
+			listTasks()
+		case "2":
+			addTask()
+		case "3":
+			tasks = removeTask(tasks)
+		case "4":
+			tasks = renameTask(tasks)
+		case "5":
+			tasks = changeStatus(tasks)
+		case "6":
+			loadTasks()
+		case "7":
 			return
+		default:
+			fmt.Println("Неизвестная команда")
 		}
-		id := 1
-		if len(tasks) > 0 {
-			id = tasks[len(tasks)-1].ID + 1
-		}
-		tasks = append(tasks, Task{ID: id, Name: name, Done: false})
-		saveTasks()
-		list.Refresh()
-		input.SetText("")
-	})
-
-	// Кнопка удалить
-	delBtn := widget.NewButton("Удалить по ID", func() {
-		dialog.ShowEntryDialog("Удалить задачу", "Введите ID задачи", func(idStr string) {
-			var id int
-			fmt.Sscanf(idStr, "%d", &id)
-			index := -1
-			for i, t := range tasks {
-				if t.ID == id {
-					index = i
-					break
-				}
-			}
-			if index != -1 {
-				tasks = append(tasks[:index], tasks[index+1:]...)
-				// пересчет ID
-				for i := range tasks {
-					tasks[i].ID = i + 1
-				}
-				saveTasks()
-				list.Refresh()
-			}
-		}, w)
-	})
-
-	// Кнопка изменить название
-	editBtn := widget.NewButton("Переименовать", func() {
-		dialog.ShowEntryDialog("Переименовать задачу", "Введите ID и новое название через ':'", func(text string) {
-			parts := strings.SplitN(text, ":", 2)
-			if len(parts) != 2 {
-				return
-			}
-			var id int
-			fmt.Sscanf(parts[0], "%d", &id)
-			newName := strings.TrimSpace(parts[1])
-			for i := range tasks {
-				if tasks[i].ID == id {
-					tasks[i].Name = newName
-					saveTasks()
-					list.Refresh()
-					break
-				}
-			}
-		}, w)
-	})
-
-	// Кнопка изменить статус
-	statusBtn := widget.NewButton("Сменить статус", func() {
-		dialog.ShowEntryDialog("Изменить статус", "Введите ID задачи", func(idStr string) {
-			var id int
-			fmt.Sscanf(idStr, "%d", &id)
-			for i := range tasks {
-				if tasks[i].ID == id {
-					tasks[i].Done = !tasks[i].Done
-					saveTasks()
-					list.Refresh()
-					break
-				}
-			}
-		}, w)
-	})
-
-	// Сборка интерфейса
-	w.SetContent(container.NewVBox(
-		list,
-		input,
-		container.NewHBox(addBtn, delBtn),
-		container.NewHBox(editBtn, statusBtn),
-	))
-
-	w.ShowAndRun()
+	}
 }
