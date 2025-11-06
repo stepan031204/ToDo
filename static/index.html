@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ToDo Mini App</title>
+<style>
+body {
+  font-family: system-ui, sans-serif;
+  margin: 0; padding: 0;
+  background: var(--tg-theme-bg-color, #fff);
+  color: var(--tg-theme-text-color, #000);
+}
+.container {
+  max-width: 400px; margin: 0 auto; padding: 20px;
+}
+.task {
+  display: flex; justify-content: space-between;
+  align-items: center; padding: 10px;
+  border-bottom: 1px solid #ccc;
+  transition: background 0.2s;
+}
+.task.done { text-decoration: line-through; opacity: 0.6; }
+button {
+  background: var(--tg-theme-button-color, #0088cc);
+  color: white; border: none; padding: 8px 12px;
+  border-radius: 8px; cursor: pointer;
+  transition: background 0.3s;
+}
+button:hover { background: #006fa1; }
+input {
+  width: 80%; padding: 8px; border-radius: 6px;
+  border: 1px solid #ccc;
+}
+.add-box { display: flex; gap: 8px; margin-bottom: 20px; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h2>📝 Мои задачи</h2>
+  <div class="add-box">
+    <input id="taskInput" placeholder="Новая задача...">
+    <button onclick="addTask()">➕</button>
+  </div>
+  <div id="tasks"></div>
+</div>
+
+<script>
+const tg = window.Telegram?.WebApp;
+tg?.expand();
+
+async function loadTasks() {
+  const res = await fetch('/api/list');
+  const data = await res.json();
+  const list = document.getElementById('tasks');
+  list.innerHTML = '';
+  data.forEach(t => {
+    const div = document.createElement('div');
+    div.className = 'task' + (t.done ? ' done' : '');
+    div.innerHTML = `
+      <span>${t.name}</span>
+      <button onclick="toggleTask(${t.id})">${t.done ? '✅' : '☑️'}</button>
+    `;
+    list.appendChild(div);
+  });
+}
+
+async function addTask() {
+  const name = document.getElementById('taskInput').value.trim();
+  if (!name) return;
+  await fetch('/api/add', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name })
+  });
+  document.getElementById('taskInput').value = '';
+  loadTasks();
+}
+
+async function toggleTask(id) {
+  await fetch('/api/toggle', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id })
+  });
+  loadTasks();
+}
+
+loadTasks();
+</script>
+</body>
+</html>
