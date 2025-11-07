@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>ToDo — Frontend</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="container">
+    <h1>📝 Мои задачи</h1>
+
+    <form id="addForm" class="add-form">
+      <input id="nameInput" name="name" type="text" placeholder="Новая задача..." required />
+      <button type="submit">Добавить</button>
+    </form>
+
+    <section id="tasksContainer" class="tasks"></section>
+
+    <div id="status" class="status" aria-live="polite"></div>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>
