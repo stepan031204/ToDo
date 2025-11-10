@@ -42,8 +42,10 @@ async function loadTasks() {
 
 function createTaskElement(task) {
   const wrap = document.createElement('div');
-  wrap.className = 'task';
-
+  wrap.className = 'task hidden';
+  setTimeout(() => {
+    wrap.classList.remove('hidden');
+  }, 10); 
   const left = document.createElement('div');
   left.className = 'left';
 
@@ -100,20 +102,27 @@ checkbox.addEventListener('click', async (e) => {
     console.error(err);
   }
 });
-  del.addEventListener('click', async (e) => {
-    e.preventDefault();
-    if (!confirm('Удалить задачу?')) return;
-    try {
-      await apiFetch(`/api/delete?id=${task.id}`, { method: 'DELETE' });
-      wrap.remove();
-      showStatus('Задача удалена');
-    } catch (err) {
-      showStatus('Ошибка удаления: ' + err.message);
-    }
-  });
+del.addEventListener('click', async (e) => {
+  e.preventDefault();
+  if (!confirm('Удалить задачу?')) return;
+
+  try {
+    await apiFetch(`/api/delete?id=${task.id}`, { method: 'DELETE' });
+
+    // плавное исчезновение
+    wrap.classList.add('hidden');
+    setTimeout(() => wrap.remove(), 300); // ждем окончания анимации
+
+    showStatus('Задача удалена');
+  } catch (err) {
+    showStatus('Ошибка удаления: ' + err.message);
+    console.error(err);
+  }
+});
 
   return wrap;
 }
+
 
 function renderTasks(tasks) {
   tasksContainer.innerHTML = '';

@@ -97,3 +97,19 @@ h1 {
   font-weight: bold;
   min-height: 20px;
 }
+.task {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px;
+  background: white;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  opacity: 1;              /* видимость по умолчанию */
+  transform: translateY(0); /* начальная позиция */
+  transition: opacity 0.3s ease, transform 0.3s ease; /* плавный переход */
+}
+
+.task.hidden {
+  opacity: 0;               /* невидимая */
+  transform: translateY(-10px); /* сдвигаем вверх */
+}
