@@ -21,6 +21,8 @@ var (
 	mu       sync.Mutex
 )
 
+// ---- Работа с файлом ----
+
 func loadTasks() {
 	data, err := os.ReadFile(fileName)
 	if err != nil {
@@ -35,9 +37,14 @@ func loadTasks() {
 }
 
 func saveTasks() {
+	if tasks == nil {
+		tasks = []Task{}
+	}
 	data, _ := json.MarshalIndent(tasks, "", "  ")
 	os.WriteFile(fileName, data, 0644)
 }
+
+// ---- API ----
 
 func getTasks(w http.ResponseWriter, r *http.Request) {
 	mu.Lock()
@@ -54,12 +61,16 @@ func addTask(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Name string `json:"name"`
 	}
-	json.NewDecoder(r.Body).Decode(&req)
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Name == "" {
+		http.Error(w, "Неверный ввод", http.StatusBadRequest)
+		return
+	}
 
 	id := 1
 	if len(tasks) > 0 {
 		id = tasks[len(tasks)-1].ID + 1
 	}
+
 	tasks = append(tasks, Task{ID: id, Name: req.Name, Done: false})
 	saveTasks()
 	w.WriteHeader(http.StatusCreated)
@@ -102,12 +113,13 @@ func deleteTask(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	loadTasks()
+
 	http.HandleFunc("/api/tasks", getTasks)
 	http.HandleFunc("/api/add", addTask)
 	http.HandleFunc("/api/toggle", toggleTask)
 	http.HandleFunc("/api/delete", deleteTask)
 
-	// отдаём фронтенд из папки frontend/
 	http.Handle("/", http.FileServer(http.Dir("frontend")))
 
 	fmt.Println("🚀 Сервер запущен на http://localhost:8081")

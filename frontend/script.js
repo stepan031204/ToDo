@@ -1,4 +1,4 @@
-// ---- Константы DOM ----
+// ---- DOM элементы ----
 const tasksContainer = document.getElementById('tasksContainer');
 const addForm = document.getElementById('addForm');
 const nameInput = document.getElementById('nameInput');
@@ -6,25 +6,21 @@ const statusEl = document.getElementById('status');
 
 // ---- Вспомогательные функции ----
 
-// helper: показывает текст состояния пользователю (и автоматически скрывает через 3s)
 function showStatus(text, timeout = 3000) {
   statusEl.textContent = text;
   if (timeout > 0) {
     setTimeout(() => {
-      // если статус не изменили за это время, очистим
       if (statusEl.textContent === text) statusEl.textContent = '';
     }, timeout);
   }
 }
 
-// helper: обёртка для fetch с проверкой статуса
 async function apiFetch(url, options = {}) {
-  const res = await fetch(url, options);           // отправляем запрос
+  const res = await fetch(url, options);
   if (!res.ok) {
     const text = await res.text().catch(() => res.statusText);
     throw new Error(`HTTP ${res.status}: ${text}`);
   }
-  // some endpoints return empty body (DELETE, POST add -> 201 with empty body), handle gracefully
   const ct = res.headers.get('Content-Type') || '';
   if (ct.includes('application/json')) {
     return await res.json();
@@ -32,7 +28,8 @@ async function apiFetch(url, options = {}) {
   return null;
 }
 
-// Загружает задачи с бэкенда и рендерит их в DOM
+// ---- Основная логика ----
+
 async function loadTasks() {
   try {
     const data = await apiFetch('/api/tasks');
@@ -43,29 +40,25 @@ async function loadTasks() {
   }
 }
 
-// Создаёт DOM-элемент карточки задачи и навешивает обработчики
 function createTaskElement(task) {
-  // контейнер карточки
   const wrap = document.createElement('div');
   wrap.className = 'task';
 
-  // левая часть: чекбокс + название
   const left = document.createElement('div');
   left.className = 'left';
 
   const checkbox = document.createElement('div');
   checkbox.className = 'checkbox';
-  checkbox.title = task.Done ? 'Отменить выполнение' : 'Отметить как выполненное';
-  checkbox.textContent = task.Done ? '✔' : '';
+  checkbox.title = task.done ? 'Отменить выполнение' : 'Отметить как выполненное';
+  checkbox.textContent = task.done ? '✔' : '';
 
   const name = document.createElement('div');
-  name.className = 'name' + (task.Done ? ' done' : '');
-  name.textContent = `${task.ID}. ${task.Name}`;
+  name.className = 'name' + (task.done ? ' done' : '');
+  name.textContent = `${task.id}. ${task.name}`;
 
   left.appendChild(checkbox);
   left.appendChild(name);
 
-  // правая часть: кнопки действий
   const actions = document.createElement('div');
   actions.className = 'actions';
 
@@ -75,58 +68,55 @@ function createTaskElement(task) {
   del.title = 'Удалить задачу';
 
   actions.appendChild(del);
-
   wrap.appendChild(left);
   wrap.appendChild(actions);
 
-  // --- обработчики событий ---
+  // --- Обработчики ---
 
-  // переключение статуса через API (POST /api/toggle с JSON {id: ...})
-  checkbox.addEventListener('click', async (e) => {
-    e.preventDefault();
-    // оптимистично меняем UI — пользователь видит мгновенный отклик
-    task.Done = !task.Done;
-    checkbox.textContent = task.Done ? '✔' : '';
-    name.className = 'name' + (task.Done ? ' done' : '');
+  checkbox.classList.toggle('checked', task.done);
 
-    try {
-      await apiFetch('/api/toggle', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: task.ID })
-      });
-      showStatus('Статус обновлён');
-    } catch (err) {
-      // если ошибка, откатываем UI и показываем сообщение
-      task.Done = !task.Done;
-      checkbox.textContent = task.Done ? '✔' : '';
-      name.className = 'name' + (task.Done ? ' done' : '');
-      showStatus('Не удалось обновить статус: ' + err.message);
-      console.error(err);
-    }
-  });
+// при клике на чекбокс
+checkbox.addEventListener('click', async (e) => {
+  e.preventDefault();
+  task.done = !task.done;
 
-  // удаление задачи (DELETE /api/delete?id=...)
+  // плавно обновляем UI
+  checkbox.classList.toggle('checked', task.done);
+  name.classList.toggle('done', task.done);
+
+  try {
+    await apiFetch('/api/toggle', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: task.id })
+    });
+    showStatus('Статус обновлён');
+  } catch (err) {
+    // если ошибка, откатываем UI
+    task.done = !task.done;
+    checkbox.classList.toggle('checked', task.done);
+    name.classList.toggle('done', task.done);
+    showStatus('Не удалось обновить статус: ' + err.message);
+    console.error(err);
+  }
+});
   del.addEventListener('click', async (e) => {
     e.preventDefault();
     if (!confirm('Удалить задачу?')) return;
-
     try {
-      await apiFetch(`/api/delete?id=${task.ID}`, { method: 'DELETE' });
-      wrap.remove(); // убрать элемент из DOM
+      await apiFetch(`/api/delete?id=${task.id}`, { method: 'DELETE' });
+      wrap.remove();
       showStatus('Задача удалена');
     } catch (err) {
       showStatus('Ошибка удаления: ' + err.message);
-      console.error(err);
     }
   });
 
   return wrap;
 }
 
-// Рендер всего списка задач: очищаем контейнер и добавляем карточки
 function renderTasks(tasks) {
-  tasksContainer.innerHTML = ''; // очистить
+  tasksContainer.innerHTML = '';
   if (!tasks.length) {
     const p = document.createElement('p');
     p.textContent = 'Пока нет задач ✨';
@@ -139,9 +129,10 @@ function renderTasks(tasks) {
   }
 }
 
-// Обработка отправки формы добавления задачи
+// ---- Обработка добавления ----
+
 addForm.addEventListener('submit', async (e) => {
-  e.preventDefault(); // предотвратить перезагрузку страницы
+  e.preventDefault();
   const name = nameInput.value.trim();
   if (!name) return;
 
@@ -153,12 +144,11 @@ addForm.addEventListener('submit', async (e) => {
     });
     nameInput.value = '';
     showStatus('Задача добавлена');
-    await loadTasks(); // перезагрузим список с сервера (надёжный способ синхронизироваться)
+    await loadTasks();
   } catch (err) {
     showStatus('Ошибка при добавлении: ' + err.message);
-    console.error(err);
   }
 });
 
-// Загрузим задачи при старте страницы
+// ---- Запуск ----
 loadTasks();
