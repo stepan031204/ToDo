@@ -65,7 +65,7 @@ function createTaskElement(task) {
   actions.className = 'actions';
 
   const del = document.createElement('a');
-  del.textContent = '🗑';
+  del.textContent = 'x';
   del.href = '#';
   del.title = 'Удалить задачу';
 
@@ -126,9 +126,10 @@ del.addEventListener('click', async (e) => {
 
 function renderTasks(tasks) {
   tasksContainer.innerHTML = '';
+
   if (!tasks.length) {
     const p = document.createElement('p');
-    p.textContent = 'Пока нет задач ✨';
+    p.textContent = 'Пока нет задач )';
     tasksContainer.appendChild(p);
     return;
   }
